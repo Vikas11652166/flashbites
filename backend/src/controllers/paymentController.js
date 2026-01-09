@@ -6,10 +6,13 @@ const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STR
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Initialize Razorpay only if credentials are provided
+const razorpay = process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET 
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    })
+  : null;
 
 // @desc    Create Stripe payment intent
 // @route   POST /api/payments/stripe/create-intent
@@ -50,6 +53,12 @@ exports.createStripePaymentIntent = async (req, res) => {
 exports.createRazorpayOrder = async (req, res) => {
   try {
     console.log('💳 Creating Razorpay order...');
+    
+    // Check if Razorpay is configured
+    if (!razorpay) {
+      return errorResponse(res, 503, 'Payment gateway not configured. Please contact support.');
+    }
+    
     const { orderId, amount } = req.body;
     
     console.log('Order ID:', orderId);
@@ -124,6 +133,11 @@ exports.verifyPayment = async (req, res) => {
 
     // Verify Razorpay signature if gateway is Razorpay
     if (gateway === 'razorpay' && gatewayResponse) {
+      // Check if Razorpay is configured
+      if (!process.env.RAZORPAY_KEY_SECRET) {
+        return errorResponse(res, 503, 'Payment gateway not configured. Please contact support.');
+      }
+      
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = gatewayResponse;
       
       console.log('🔐 Verifying Razorpay signature...');
