@@ -30,13 +30,13 @@ Razorpay payment gateway has been successfully integrated into FlashBites for bo
 
 ### Backend (.env)
 ```env
-RAZORPAY_KEY_ID=rzp_test_S0ENgxYhz3E8si
-RAZORPAY_KEY_SECRET=DzxA5afabRy4eZC0TPO9OiVY
+RAZORPAY_KEY_ID=your_razorpay_test_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_test_key_secret
 ```
 
 ### Frontend (.env)
 ```env
-VITE_RAZORPAY_KEY_ID=rzp_test_S0ENgxYhz3E8si
+VITE_RAZORPAY_KEY_ID=your_razorpay_test_key_id
 ```
 
 **Note:** These are TEST credentials. Replace with LIVE credentials for production.
