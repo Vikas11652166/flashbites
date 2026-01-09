@@ -1,7 +1,8 @@
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe only if credentials are provided
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
