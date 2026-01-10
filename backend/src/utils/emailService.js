@@ -1,4 +1,8 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+// Initialize Resend if API key is available
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Create transporter
 const createTransporter = () => {
@@ -21,20 +25,12 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP email with retry logic
+// Send OTP email with Resend (fallback to nodemailer)
 const sendOTPEmail = async (email, otp, purpose = 'verification') => {
   // Always log OTP for development/debugging
   console.log(`📧 Sending OTP to ${email}: ${otp} (${purpose})`);
   
   try {
-    // Check if email credentials are configured
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('⚠️  Email credentials not configured. OTP logged above.');
-      return true; // Return true to not block the flow
-    }
-
-    const transporter = createTransporter();
-    
     const subject = purpose === 'verification' 
       ? 'FlashBites - Email Verification OTP'
       : 'FlashBites - Password Reset OTP';
@@ -43,35 +39,61 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
       ? `Your OTP for email verification is: <b>${otp}</b>. This OTP will expire in 10 minutes.`
       : `Your OTP for password reset is: <b>${otp}</b>. This OTP will expire in 10 minutes.`;
 
-    const mailOptions = {
-      from: `FlashBites <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #f97316; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">FlashBites</h1>
-          </div>
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-            <h2 style="color: #333;">OTP Verification</h2>
-            <p style="color: #666; font-size: 16px;">${message}</p>
-            <div style="background-color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px; border: 2px dashed #f97316;">
-              <span style="font-size: 32px; font-weight: bold; color: #f97316; letter-spacing: 5px;">${otp}</span>
-            </div>
-            <p style="color: #999; font-size: 14px;">If you didn't request this OTP, please ignore this email.</p>
-            <p style="color: #999; font-size: 14px;">This is an automated email, please do not reply.</p>
-          </div>
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f97316; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">FlashBites</h1>
         </div>
-      `
-    };
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333;">OTP Verification</h2>
+          <p style="color: #666; font-size: 16px;">${message}</p>
+          <div style="background-color: white; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px; border: 2px dashed #f97316;">
+            <span style="font-size: 32px; font-weight: bold; color: #f97316; letter-spacing: 5px;">${otp}</span>
+          </div>
+          <p style="color: #999; font-size: 14px;">If you didn't request this OTP, please ignore this email.</p>
+          <p style="color: #999; font-size: 14px;">This is an automated email, please do not reply.</p>
+        </div>
+      </div>
+    `;
 
-    // Verify connection first
-    await transporter.verify();
-    console.log('✅ SMTP connection verified');
-    
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${email}. MessageID: ${info.messageId}`);
+    // Try Resend first (best deliverability)
+    if (resend && process.env.RESEND_API_KEY) {
+      console.log('📨 Using Resend API...');
+      const { data, error } = await resend.emails.send({
+        from: 'FlashBites <onboarding@resend.dev>', // Use verified domain or resend.dev for testing
+        to: [email],
+        subject: subject,
+        html: htmlContent,
+      });
+
+      if (error) {
+        console.error('❌ Resend error:', error);
+        throw error;
+      }
+
+      console.log(`✅ Email sent via Resend to ${email}. ID: ${data.id}`);
+      return true;
+    }
+
+    // Fallback to Gmail SMTP
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      console.log('📨 Using Gmail SMTP fallback...');
+      const transporter = createTransporter();
+      
+      const mailOptions = {
+        from: `FlashBites <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: subject,
+        html: htmlContent
+      };
+
+      await transporter.verify();
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent via Gmail to ${email}. MessageID: ${info.messageId}`);
+      return true;
+    }
+
+    console.warn('⚠️ No email service configured. OTP logged above.');
     return true;
     
   } catch (error) {
