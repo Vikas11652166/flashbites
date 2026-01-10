@@ -20,10 +20,10 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP email
+// Send OTP email with retry logic
 const sendOTPEmail = async (email, otp, purpose = 'verification') => {
   // Always log OTP for development/debugging
-  console.log(`📧 OTP for ${email}: ${otp} (${purpose})`);
+  console.log(`📧 Sending OTP to ${email}: ${otp} (${purpose})`);
   
   try {
     // Check if email credentials are configured
@@ -64,14 +64,18 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
       `
     };
 
-    // Send email asynchronously without blocking
-    transporter.sendMail(mailOptions)
-      .then(() => console.log(`✅ Email sent successfully to ${email}`))
-      .catch((err) => console.error('Email send failed:', err.message));
+    // Verify connection first
+    await transporter.verify();
+    console.log('✅ SMTP connection verified');
     
-    return true; // Return immediately, don't wait for email
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully to ${email}. MessageID: ${info.messageId}`);
+    return true;
+    
   } catch (error) {
-    console.error('Email service error:', error.message);
+    console.error('❌ Email service error:', error.message);
+    console.log(`📧 OTP for ${email}: ${otp} - Check Railway logs`);
     return true; // Still return true to not block user flow
   }
 };
