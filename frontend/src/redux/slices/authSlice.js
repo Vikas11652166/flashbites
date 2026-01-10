@@ -47,7 +47,8 @@ export const getCurrentUser = createAsyncThunk(
       const response = await authApi.getCurrentUser();
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to fetch user';
+      return rejectWithValue(errorMsg);
     }
   }
 );
@@ -117,9 +118,12 @@ const authSlice = createSlice({
         state.user = action.payload.user;
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
-        console.log('GET CURRENT USER FAILED:', action.payload);
+        // Silently fail if user fetch fails - they're still logged in
+        // Only log in development
+        if (import.meta.env.DEV) {
+          console.warn('Failed to fetch current user:', action.payload || action.error?.message);
+        }
         // Don't clear auth state - user is still logged in, just couldn't fetch updated data
-        // Only clear if it's an authentication error (401)
       });
   },
 });
