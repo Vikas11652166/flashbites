@@ -1,18 +1,40 @@
 const nodemailer = require('nodemailer');
 
+// Log nodemailer initialization
+console.log('📧 Initializing nodemailer...');
+console.log('nodemailer version:', nodemailer?.version || 'unknown');
+console.log('createTransport available:', typeof nodemailer?.createTransport === 'function');
+
 // Create Gmail transporter
 const createTransporter = () => {
-  if (!nodemailer || typeof nodemailer.createTransporter !== 'function') {
-    throw new Error('Nodemailer not properly initialized');
-  }
-  
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
+  try {
+    // Verify nodemailer is properly loaded
+    if (!nodemailer || typeof nodemailer.createTransport !== 'function') {
+      console.error('❌ nodemailer.createTransport not available');
+      console.error('nodemailer object:', nodemailer);
+      throw new Error('Nodemailer module not properly loaded');
     }
-  });
+
+    console.log('✅ Creating Gmail transporter...');
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // Use STARTTLS
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
+    console.log('✅ Transporter created successfully');
+    return transporter;
+  } catch (error) {
+    console.error('❌ Failed to create transporter:', error);
+    throw error;
+  }
 };
 
 // Generate 6-digit OTP
