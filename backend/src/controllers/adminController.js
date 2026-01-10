@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const Payment = require('../models/Payment');
+const Coupon = require('../models/Coupon');
+const { notifyCouponAvailable, notifyUser } = require('../utils/notificationService');
 
 // @desc    Get admin dashboard statistics
 // @route   GET /api/admin/dashboard
@@ -215,5 +217,136 @@ exports.blockUser = async (req, res) => {
     successResponse(res, 200, `User ${isActive ? 'unblocked' : 'blocked'}`, { user });
   } catch (error) {
     errorResponse(res, 500, 'Failed to update user status', error.message);
+  }
+};
+
+// @desc    Create coupon
+// @route   POST /api/admin/coupons
+// @access  Private (Admin)
+exports.createCoupon = async (req, res) => {
+  try {
+    const {
+      code,
+      description,
+      discountType,
+      discountValue,
+      minOrderValue,
+      maxDiscount,
+      validFrom,
+      validTill,
+      usageLimit,
+      applicableRestaurants,
+      userSpecific,
+      applicableUsers,
+      autoApply
+    } = req.body;
+
+    const coupon = await Coupon.create({
+      code: code.toUpperCase(),
+      description,
+      discountType,
+      discountValue,
+      minOrderValue: minOrderValue || 0,
+      maxDiscount,
+      validFrom,
+      validTill,
+      usageLimit,
+      applicableRestaurants,
+      userSpecific: userSpecific || false,
+      applicableUsers: applicableUsers || [],
+      autoApply: autoApply || false,
+      createdBy: req.user._id
+    });
+
+    // Notify users about new coupon
+    if (userSpecific && applicableUsers && applicableUsers.length > 0) {
+      await notifyCouponAvailable(applicableUsers, coupon);
+    } else if (!userSpecific) {
+      // Notify all users
+      const allUsers = await User.find({ role: 'user', isActive: true }).select('_id');
+      const userIds = allUsers.map(u => u._id);
+      await notifyCouponAvailable(userIds, coupon);
+    }
+
+    successResponse(res, 201, 'Coupon created successfully', { coupon });
+  } catch (error) {
+    errorResponse(res, 500, 'Failed to create coupon', error.message);
+  }
+};
+
+// @desc    Get all coupons
+// @route   GET /api/admin/coupons
+// @access  Private (Admin)
+exports.getAllCoupons = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+
+    const filter = {};
+    if (status === 'active') {
+      filter.isActive = true;
+      filter.validTill = { $gte: new Date() };
+    } else if (status === 'expired') {
+      filter.validTill = { $lt: new Date() };
+    } else if (status === 'inactive') {
+      filter.isActive = false;
+    }
+
+    const coupons = await Coupon.find(filter)
+      .populate('createdBy', 'name email')
+      .populate('applicableRestaurants', 'name')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Coupon.countDocuments(filter);
+
+    successResponse(res, 200, 'Coupons fetched successfully', {
+      coupons,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    errorResponse(res, 500, 'Failed to fetch coupons', error.message);
+  }
+};
+
+// @desc    Update coupon
+// @route   PUT /api/admin/coupons/:id
+// @access  Private (Admin)
+exports.updateCoupon = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!coupon) {
+      return errorResponse(res, 404, 'Coupon not found');
+    }
+
+    successResponse(res, 200, 'Coupon updated successfully', { coupon });
+  } catch (error) {
+    errorResponse(res, 500, 'Failed to update coupon', error.message);
+  }
+};
+
+// @desc    Delete coupon
+// @route   DELETE /api/admin/coupons/:id
+// @access  Private (Admin)
+exports.deleteCoupon = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndDelete(req.params.id);
+
+    if (!coupon) {
+      return errorResponse(res, 404, 'Coupon not found');
+    }
+
+    successResponse(res, 200, 'Coupon deleted successfully');
+  } catch (error) {
+    errorResponse(res, 500, 'Failed to delete coupon', error.message);
   }
 };

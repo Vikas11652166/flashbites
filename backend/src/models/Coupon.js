@@ -53,10 +53,28 @@ const couponSchema = new mongoose.Schema({
   applicableRestaurants: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Restaurant'
-  }]
+  }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  userSpecific: {
+    type: Boolean,
+    default: false
+  },
+  applicableUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  autoApply: {
+    type: Boolean,
+    default: false
+  }
 }, { timestamps: true });
 
 couponSchema.index({ code: 1 });
 couponSchema.index({ validFrom: 1, validTill: 1 });
+couponSchema.index({ isActive: 1, validTill: 1 });
 
 module.exports = mongoose.model('Coupon', couponSchema);

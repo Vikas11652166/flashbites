@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const MenuItem = require('../models/MenuItem');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
+const { notifyOrderStatus } = require('../utils/notificationService');
 
 // @desc    Create new order
 // @route   POST /api/orders
@@ -281,6 +282,20 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     await order.save();
+
+    // Send notification for status update
+    const statusMap = {
+      confirmed: 'confirmed',
+      preparing: 'preparing',
+      ready: 'ready',
+      out_for_delivery: 'picked_up',
+      delivered: 'delivered',
+      cancelled: 'cancelled'
+    };
+    
+    if (statusMap[status]) {
+      await notifyOrderStatus(order, statusMap[status]);
+    }
 
     successResponse(res, 200, 'Order status updated successfully', { order });
   } catch (error) {
