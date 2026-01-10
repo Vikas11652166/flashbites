@@ -46,8 +46,24 @@ const Login = () => {
     } else if (login.rejected.match(result)) {
       const errorMsg = result.payload || result.error?.message || 'Login failed';
       
+      // Check if user signed up with Google OAuth
+      if (errorMsg.includes('Google Sign-In') || errorMsg.includes('Continue with Google')) {
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Google Account Detected</span>
+            <span className="text-sm">{errorMsg}</span>
+          </div>,
+          {
+            duration: 6000,
+            icon: '🔐',
+            style: {
+              maxWidth: '400px',
+            }
+          }
+        );
+      }
       // Check if user not found (404 status)
-      if (errorMsg.includes('No account found') || errorMsg.includes('not found')) {
+      else if (errorMsg.includes('No account found') || errorMsg.includes('not found')) {
         toast.error('No account found with this email', {
           duration: 5000,
           icon: '🔍'
@@ -72,13 +88,17 @@ const Login = () => {
           });
         }, 1000);
       } else {
-        toast.error(errorMsg);
+        toast.error(errorMsg, {
+          duration: 4000,
+        });
       }
     }
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:8080/api/auth/google';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+    const baseUrl = apiUrl.replace('/api', ''); // Remove /api suffix to get base URL
+    window.location.href = `${baseUrl}/api/auth/google`;
   };
 
   return (

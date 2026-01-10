@@ -198,7 +198,13 @@ exports.login = async (req, res) => {
       return errorResponse(res, 404, 'No account found with this email. Please sign up first.');
     }
 
-    console.log('User found:', user.email, '| Role:', user.role, '| Active:', user.isActive);
+    console.log('User found:', user.email, '| Role:', user.role, '| Active:', user.isActive, '| Google OAuth:', !!user.googleId);
+
+    // Check if user signed up with Google OAuth
+    if (user.googleId) {
+      console.log('User signed up with Google OAuth, cannot use email/password login');
+      return errorResponse(res, 400, 'This account was created using Google Sign-In. Please use "Continue with Google" to login.');
+    }
 
     // Check if user is active
     if (!user.isActive) {

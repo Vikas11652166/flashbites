@@ -172,7 +172,9 @@ const Register = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:8080/api/auth/google';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+    const baseUrl = apiUrl.replace('/api', ''); // Remove /api suffix to get base URL
+    window.location.href = `${baseUrl}/api/auth/google`;
   };
 
   return (
