@@ -147,9 +147,6 @@ exports.register = async (req, res) => {
     
     await userWithOTP.save();
 
-    // Send welcome email
-    await sendWelcomeEmail(email, name);
-
     // Generate tokens
     const accessToken = generateToken(userWithOTP._id);
     const refreshToken = generateRefreshToken(userWithOTP._id);
@@ -167,6 +164,11 @@ exports.register = async (req, res) => {
       accessToken,
       refreshToken
     });
+
+    // Send welcome email in background (don't await)
+    sendWelcomeEmail(email, name)
+      .catch(err => console.error('Background welcome email failed:', err.message));
+
   } catch (error) {
     errorResponse(res, 500, 'Registration failed', error.message);
   }
@@ -383,10 +385,13 @@ exports.resetPassword = async (req, res) => {
     user.refreshToken = null; // Invalidate all sessions
     await user.save();
 
-    // Send success email
-    await sendPasswordResetSuccessEmail(email, user.name);
-
+    // Send success response immediately
     successResponse(res, 200, 'Password reset successful. Please login with your new password.');
+
+    // Send success email in background (don't await)
+    sendPasswordResetSuccessEmail(email, user.name)
+      .catch(err => console.error('Background password reset email failed:', err.message));
+
   } catch (error) {
     errorResponse(res, 500, 'Password reset failed', error.message);
   }
