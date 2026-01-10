@@ -9,6 +9,7 @@ import {
 import { logout } from '../../redux/slices/authSlice';
 import { toggleCart } from '../../redux/slices/uiSlice';
 import toast from 'react-hot-toast';
+import logo from '../../assets/logo.png';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -33,13 +34,9 @@ const Navbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <img 
-              src="/logo.png" 
+              src={logo} 
               alt="FlashBites Logo" 
               className="h-12 w-12 object-contain rounded-full"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                console.error('Logo failed to load');
-              }}
             />
             <span className="text-2xl font-bold text-primary-600">FlashBites</span>
           </Link>
