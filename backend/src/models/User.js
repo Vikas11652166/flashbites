@@ -22,9 +22,10 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false, // Optional for Google OAuth users
     trim: true,
-    match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number']
+    match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number'],
+    default: null
   },
   googleId: {
     type: String,
@@ -115,7 +116,7 @@ userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
 
 // Indexes
 userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ phone: 1 }, { unique: true });
+userSchema.index({ phone: 1 }, { unique: true, sparse: true }); // Sparse allows multiple null values
 userSchema.index({ role: 1 });
 
 module.exports = mongoose.model('User', userSchema);

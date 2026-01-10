@@ -67,17 +67,23 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
       });
 
       if (error) {
-        console.error('❌ Resend error:', error);
-        throw error;
+        console.error('❌ Resend error:', error.message || error);
+        // If Resend fails (like unverified domain), try Gmail fallback
+        if (error.statusCode === 403 || error.name === 'validation_error') {
+          console.log('📨 Falling back to Gmail SMTP...');
+          // Fall through to Gmail
+        } else {
+          throw error;
+        }
+      } else {
+        console.log(`✅ Email sent via Resend to ${email}. ID: ${data.id}`);
+        return true;
       }
-
-      console.log(`✅ Email sent via Resend to ${email}. ID: ${data.id}`);
-      return true;
     }
 
-    // Fallback to Gmail SMTP
+    // Fallback to Gmail SMTP (or if Resend not configured)
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-      console.log('📨 Using Gmail SMTP fallback...');
+      console.log('📨 Using Gmail SMTP...');
       const transporter = createTransporter();
       
       const mailOptions = {
