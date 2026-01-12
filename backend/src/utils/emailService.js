@@ -1,11 +1,15 @@
-const sgMail = require('@sendgrid/mail');
+const Mailjet = require('node-mailjet');
 
-// Initialize SendGrid with API key
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('✅ SendGrid initialized successfully');
+// Initialize Mailjet with API keys
+let mailjet = null;
+if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) {
+  mailjet = Mailjet.apiConnect(
+    process.env.MAILJET_API_KEY,
+    process.env.MAILJET_SECRET_KEY
+  );
+  console.log('✅ Mailjet initialized successfully');
 } else {
-  console.warn('⚠️ SendGrid API key not configured');
+  console.warn('⚠️ Mailjet API keys not configured');
 }
 
 // Generate 6-digit OTP
@@ -13,15 +17,15 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP email using SendGrid
+// Send OTP email using Mailjet
 const sendOTPEmail = async (email, otp, purpose = 'verification') => {
   // Always log OTP for development/debugging
   console.log(`📧 Sending OTP to ${email}: ${otp} (${purpose})`);
   
   try {
-    // Check if SendGrid is configured
-    if (!process.env.SENDGRID_API_KEY) {
-      console.warn('⚠️ SendGrid API key not configured. OTP logged above.');
+    // Check if Mailjet is configured
+    if (!mailjet) {
+      console.warn('⚠️ Mailjet not configured. OTP logged above.');
       return true;
     }
 
@@ -50,21 +54,35 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
       </div>
     `;
 
-    console.log('📨 Using SendGrid API...');
+    console.log('📨 Using Mailjet API...');
     
-    const msg = {
-      to: email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@flashbites.com',
-      subject: subject,
-      html: htmlContent
-    };
+    const request = mailjet.post('send', { version: 'v3.1' }).request({
+      Messages: [
+        {
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL || 'noreply@flashbites.shop',
+            Name: 'FlashBites'
+          },
+          To: [
+            {
+              Email: email
+            }
+          ],
+          Subject: subject,
+          HTMLPart: htmlContent
+        }
+      ]
+    });
 
-    await sgMail.send(msg);
-    console.log(`✅ Email sent to ${email} via SendGrid`);
+    const result = await request;
+    console.log(`✅ Email sent to ${email} via Mailjet. Status: ${result.body.Messages[0].Status}`);
     return true;
     
   } catch (error) {
     console.error('❌ Email error:', error.message);
+    if (error.response) {
+      console.error('Response:', JSON.stringify(error.response.data));
+    }
     console.log(`📧 OTP for ${email}: ${otp} - Check Railway logs`);
     return true; // Still return true to not block user flow
   }
@@ -73,37 +91,48 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
 // Send welcome email
 const sendWelcomeEmail = async (email, name) => {
   try {
-    if (!process.env.SENDGRID_API_KEY) {
-      console.warn('⚠️ SendGrid not configured, skipping welcome email');
+    if (!mailjet) {
+      console.warn('⚠️ Mailjet not configured, skipping welcome email');
       return true;
     }
 
-    const msg = {
-      to: email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@flashbites.com',
-      subject: 'Welcome to FlashBites!',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #f97316; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Welcome to FlashBites!</h1>
-          </div>
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-            <h2 style="color: #333;">Hello ${name}!</h2>
-            <p style="color: #666; font-size: 16px;">Thank you for joining FlashBites. We're excited to have you on board!</p>
-            <p style="color: #666; font-size: 16px;">Start exploring delicious food from the best restaurants near you.</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3001'}" 
-                 style="background-color: #f97316; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Start Ordering
-              </a>
+    const request = mailjet.post('send', { version: 'v3.1' }).request({
+      Messages: [
+        {
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL || 'noreply@flashbites.shop',
+            Name: 'FlashBites'
+          },
+          To: [
+            {
+              Email: email
+            }
+          ],
+          Subject: 'Welcome to FlashBites!',
+          HTMLPart: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #f97316; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">Welcome to FlashBites!</h1>
+              </div>
+              <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #333;">Hello ${name}!</h2>
+                <p style="color: #666; font-size: 16px;">Thank you for joining FlashBites. We're excited to have you on board!</p>
+                <p style="color: #666; font-size: 16px;">Start exploring delicious food from the best restaurants near you.</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="https://flashbites.shop" 
+                     style="background-color: #f97316; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Start Ordering
+                  </a>
+                </div>
+                <p style="color: #999; font-size: 14px; text-align: center;">Happy eating! 🍕🍔🍜</p>
+              </div>
             </div>
-            <p style="color: #999; font-size: 14px; text-align: center;">Happy eating! 🍕🍔🍜</p>
-          </div>
-        </div>
-      `
-    };
+          `
+        }
+      ]
+    });
 
-    await sgMail.send(msg);
+    await request;
     console.log(`✅ Welcome email sent to ${email}`);
     return true;
   } catch (error) {
@@ -115,31 +144,42 @@ const sendWelcomeEmail = async (email, name) => {
 // Send password reset success email
 const sendPasswordResetSuccessEmail = async (email, name) => {
   try {
-    if (!process.env.SENDGRID_API_KEY) {
-      console.warn('⚠️ SendGrid not configured, skipping password reset email');
+    if (!mailjet) {
+      console.warn('⚠️ Mailjet not configured, skipping password reset email');
       return true;
     }
 
-    const msg = {
-      to: email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@flashbites.com',
-      subject: 'Password Reset Successful',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #10b981; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Password Reset Successful</h1>
-          </div>
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-            <h2 style="color: #333;">Hello ${name}!</h2>
-            <p style="color: #666; font-size: 16px;">Your password has been successfully reset.</p>
-            <p style="color: #666; font-size: 16px;">You can now log in with your new password.</p>
-            <p style="color: #dc2626; font-size: 14px; margin-top: 20px;">If you didn't make this change, please contact our support team immediately.</p>
-          </div>
-        </div>
-      `
-    };
+    const request = mailjet.post('send', { version: 'v3.1' }).request({
+      Messages: [
+        {
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL || 'noreply@flashbites.shop',
+            Name: 'FlashBites'
+          },
+          To: [
+            {
+              Email: email
+            }
+          ],
+          Subject: 'Password Reset Successful',
+          HTMLPart: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #10b981; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">Password Reset Successful</h1>
+              </div>
+              <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #333;">Hello ${name}!</h2>
+                <p style="color: #666; font-size: 16px;">Your password has been successfully reset.</p>
+                <p style="color: #666; font-size: 16px;">You can now log in with your new password.</p>
+                <p style="color: #dc2626; font-size: 14px; margin-top: 20px;">If you didn't make this change, please contact our support team immediately.</p>
+              </div>
+            </div>
+          `
+        }
+      ]
+    });
 
-    await sgMail.send(msg);
+    await request;
     console.log(`✅ Password reset email sent to ${email}`);
     return true;
   } catch (error) {
