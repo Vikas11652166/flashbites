@@ -69,6 +69,8 @@ const allowedOrigins = [
   'http://localhost:3001', 
   'http://localhost:5173',
   'https://flashbites.vercel.app',
+  'https://flashbites.shop',
+  'https://www.flashbites.shop',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
