@@ -109,9 +109,31 @@ const NotificationBell = () => {
 
               {/* Info */}
               <div className="pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-gray-500 text-center mb-2">
                   You'll receive real-time alerts for new orders and updates
                 </p>
+                
+                {/* Test Notification Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Test sound
+                    const notificationSound = require('../../utils/notificationSound').default;
+                    notificationSound.playNotification('new-order');
+                    
+                    // Test browser notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                      new Notification('Test Notification 🧪', {
+                        body: 'If you see this, notifications are working!',
+                        icon: '/favicon.ico',
+                        tag: 'test',
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition"
+                >
+                  🧪 Test Notification & Sound
+                </button>
               </div>
             </div>
           </div>
