@@ -49,7 +49,11 @@ const MenuCard = ({ item, restaurant }) => {
             {formatCurrency(item.price)}
           </span>
 
-          {item.isAvailable ? (
+          {!restaurant.acceptingOrders ? (
+            <span className="badge bg-red-100 text-red-800 border border-red-300">Closed</span>
+          ) : !item.isAvailable ? (
+            <span className="badge badge-danger">Not Available</span>
+          ) : (
             <button
               onClick={handleAddToCart}
               className="btn-primary flex items-center space-x-1 px-4 py-2"
@@ -57,8 +61,6 @@ const MenuCard = ({ item, restaurant }) => {
               <PlusIcon className="h-4 w-4" />
               <span>Add</span>
             </button>
-          ) : (
-            <span className="badge badge-danger">Not Available</span>
           )}
         </div>
       </div>

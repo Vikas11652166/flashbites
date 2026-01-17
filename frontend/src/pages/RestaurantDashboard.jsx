@@ -567,6 +567,46 @@ const RestaurantDashboard = () => {
             {/* Tab Content */}
             {activeTab === 'overview' && (
               <div className="bg-white rounded-lg shadow-md p-6">
+                {/* Restaurant Status Toggle */}
+                <div className="mb-6 p-4 border-2 border-orange-200 rounded-lg bg-orange-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full ${restaurant.acceptingOrders ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                      <div>
+                        <h3 className="font-bold text-lg">
+                          Restaurant Status: {restaurant.acceptingOrders ? 'OPEN' : 'CLOSED'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {restaurant.acceptingOrders 
+                            ? 'You are accepting new orders' 
+                            : 'You are not accepting new orders'}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={restaurant.acceptingOrders}
+                        onChange={async (e) => {
+                          const newStatus = e.target.checked;
+                          try {
+                            await updateRestaurant(restaurant._id, { acceptingOrders: newStatus });
+                            setRestaurant({ ...restaurant, acceptingOrders: newStatus });
+                            toast.success(`Restaurant ${newStatus ? 'opened' : 'closed'} successfully`);
+                          } catch (error) {
+                            toast.error('Failed to update restaurant status');
+                          }
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
+                      <span className="ml-3 text-sm font-medium text-gray-900">
+                        {restaurant.acceptingOrders ? 'Open' : 'Closed'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
                 <h2 className="text-xl font-bold mb-4">Restaurant Details</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>

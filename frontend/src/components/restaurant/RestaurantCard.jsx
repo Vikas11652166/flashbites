@@ -16,9 +16,21 @@ const RestaurantCard = ({ restaurant }) => {
           alt={restaurant.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
         />
+        {/* Open/Closed Badge */}
+        <div className="absolute top-2 right-2">
+          {restaurant.acceptingOrders ? (
+            <span className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full shadow-lg">
+              OPEN
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-red-500 text-white text-xs font-semibold rounded-full shadow-lg">
+              CLOSED
+            </span>
+          )}
+        </div>
         {!restaurant.acceptingOrders && (
           <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-            <span className="text-white font-semibold">Currently Closed</span>
+            <span className="text-white font-semibold text-lg">Currently Closed</span>
           </div>
         )}
       </div>

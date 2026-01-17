@@ -62,27 +62,56 @@ const RestaurantDetail = () => {
         
         <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
           <div className="max-w-7xl mx-auto">
-            <h1 className="text-4xl font-bold mb-2">{restaurant.name}</h1>
-            <p className="text-lg mb-3">{restaurant.description}</p>
-            <p className="text-sm mb-4">{restaurant.cuisines.join(' • ')}</p>
-            
-            <div className="flex items-center space-x-6 text-sm">
-              <div className="flex items-center">
-                <StarIcon className="h-5 w-5 text-yellow-400 mr-1" />
-                <span className="font-semibold">{restaurant.rating}</span>
-                <span className="ml-1">({restaurant.reviewCount} ratings)</span>
-              </div>
-              <div className="flex items-center">
-                <ClockIcon className="h-5 w-5 mr-1" />
-                <span>{restaurant.deliveryTime} mins</span>
-              </div>
+            <div className="flex items-start justify-between">
               <div>
-                Delivery: {restaurant.deliveryFee === 0 ? 'FREE' : formatCurrency(restaurant.deliveryFee)}
+                <h1 className="text-4xl font-bold mb-2">{restaurant.name}</h1>
+                <p className="text-lg mb-3">{restaurant.description}</p>
+                <p className="text-sm mb-4">{restaurant.cuisines.join(' • ')}</p>
+                
+                <div className="flex items-center space-x-6 text-sm">
+                  <div className="flex items-center">
+                    <StarIcon className="h-5 w-5 text-yellow-400 mr-1" />
+                    <span className="font-semibold">{restaurant.rating}</span>
+                    <span className="ml-1">({restaurant.reviewCount} ratings)</span>
+                  </div>
+                  <div className="flex items-center">
+                    <ClockIcon className="h-5 w-5 mr-1" />
+                    <span>{restaurant.deliveryTime} mins</span>
+                  </div>
+                  <div>
+                    Delivery: {restaurant.deliveryFee === 0 ? 'FREE' : formatCurrency(restaurant.deliveryFee)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Open/Closed Status Badge */}
+              <div className="flex flex-col items-end">
+                {restaurant.acceptingOrders ? (
+                  <span className="px-6 py-2 bg-green-500 text-white text-sm font-bold rounded-full shadow-lg mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                    OPEN NOW
+                  </span>
+                ) : (
+                  <span className="px-6 py-2 bg-red-500 text-white text-sm font-bold rounded-full shadow-lg mb-2">
+                    CLOSED
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Closed Restaurant Alert */}
+      {!restaurant.acceptingOrders && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 mb-6">
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+            <p className="text-red-800 font-semibold text-center">
+              ⚠️ This restaurant is currently closed and not accepting orders. Please check back later.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Menu Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
