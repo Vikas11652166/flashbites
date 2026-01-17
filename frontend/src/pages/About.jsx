@@ -190,46 +190,6 @@ const About = () => {
         </div>
       </div>
 
-      {/* Impact Section */}
-      <div className="bg-gradient-to-r from-orange-600 to-orange-700 text-white py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Our Impact
-            </h2>
-            <p className="text-xl text-orange-100">
-              Making a difference in communities across rural India
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-            <div className="text-center">
-              <BuildingStorefrontIcon className="h-12 w-12 mx-auto mb-3 text-orange-200" />
-              <div className="text-4xl font-bold mb-2">500+</div>
-              <div className="text-orange-100">Partner Restaurants</div>
-            </div>
-
-            <div className="text-center">
-              <UserGroupIcon className="h-12 w-12 mx-auto mb-3 text-orange-200" />
-              <div className="text-4xl font-bold mb-2">10,000+</div>
-              <div className="text-orange-100">Happy Customers</div>
-            </div>
-
-            <div className="text-center">
-              <TruckIcon className="h-12 w-12 mx-auto mb-3 text-orange-200" />
-              <div className="text-4xl font-bold mb-2">50+</div>
-              <div className="text-orange-100">Delivery Partners</div>
-            </div>
-
-            <div className="text-center">
-              <ClockIcon className="h-12 w-12 mx-auto mb-3 text-orange-200" />
-              <div className="text-4xl font-bold mb-2">30 min</div>
-              <div className="text-orange-100">Avg. Delivery Time</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Values Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="text-center mb-12">
