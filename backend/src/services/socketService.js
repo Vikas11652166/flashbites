@@ -5,6 +5,7 @@ let io;
 const userSockets = new Map(); // Map userId to socket IDs
 const restaurantSockets = new Map(); // Map restaurantId to socket IDs
 const adminSockets = new Set(); // Set of admin socket IDs
+const deliveryPartnerSockets = new Map(); // Map deliveryPartnerId to socket IDs
 
 const initializeSocket = (server) => {
   io = new Server(server, {
@@ -57,6 +58,12 @@ const initializeSocket = (server) => {
         socket.join(`restaurant-${restaurantId}`);
         console.log(`🏪 Restaurant owner joined: ${restaurantId}`);
       });
+    } else if (socket.userRole === 'delivery_partner') {
+      // Delivery partner
+      deliveryPartnerSockets.set(socket.userId, socket.id);
+      socket.join(`delivery-partner-${socket.userId}`);
+      socket.join('all-delivery-partners'); // Join global delivery partners room
+      console.log(`🚴 Delivery partner connected: ${socket.userId}`);
     } else {
       // Regular user
       userSockets.set(socket.userId, socket.id);
@@ -78,6 +85,8 @@ const initializeSocket = (server) => {
             restaurantSockets.delete(restaurantId);
           }
         });
+      } else if (socket.userRole === 'delivery_partner') {
+        deliveryPartnerSockets.delete(socket.userId);
       } else {
         userSockets.delete(socket.userId);
       }
@@ -152,8 +161,61 @@ const getOnlineStats = () => {
     users: userSockets.size,
     restaurants: restaurantSockets.size,
     admins: adminSockets.size,
+    deliveryPartners: deliveryPartnerSockets.size,
     total: io ? io.sockets.sockets.size : 0
   };
+};
+
+// Notify all delivery partners about new order
+const notifyDeliveryPartnersNewOrder = (orderData) => {
+  if (io) {
+    io.to('all-delivery-partners').emit('new-order-available', {
+      type: 'NEW_ORDER_AVAILABLE',
+      order: orderData,
+      sound: true,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📢 Notified all delivery partners of new order ${orderData._id}`);
+  }
+};
+
+// Notify specific delivery partner
+const notifyDeliveryPartner = (deliveryPartnerId, eventType, data) => {
+  if (io) {
+    io.to(`delivery-partner-${deliveryPartnerId}`).emit(eventType, {
+      type: eventType.toUpperCase(),
+      data,
+      sound: true,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📢 Notified delivery partner ${deliveryPartnerId} - ${eventType}`);
+  }
+};
+
+// Notify delivery partner about order assignment
+const notifyDeliveryPartnerOrderAssigned = (deliveryPartnerId, orderData) => {
+  if (io) {
+    io.to(`delivery-partner-${deliveryPartnerId}`).emit('order-assigned', {
+      type: 'ORDER_ASSIGNED',
+      order: orderData,
+      sound: true,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📢 Notified delivery partner ${deliveryPartnerId} of order assignment ${orderData._id}`);
+  }
+};
+
+// Notify delivery partner about order cancellation
+const notifyDeliveryPartnerOrderCancelled = (deliveryPartnerId, orderData) => {
+  if (io) {
+    io.to(`delivery-partner-${deliveryPartnerId}`).emit('order-cancelled', {
+      type: 'ORDER_CANCELLED',
+      order: orderData,
+      sound: true,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📢 Notified delivery partner ${deliveryPartnerId} of order cancellation ${orderData._id}`);
+  }
 };
 
 module.exports = {
@@ -162,5 +224,9 @@ module.exports = {
   notifyUserOrderUpdate,
   notifyAdminNewOrder,
   notifyDeliveryUpdate,
+  notifyDeliveryPartnersNewOrder,
+  notifyDeliveryPartner,
+  notifyDeliveryPartnerOrderAssigned,
+  notifyDeliveryPartnerOrderCancelled,
   getOnlineStats
 };

@@ -11,6 +11,7 @@ import {
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client';
 
 const DeliveryPartnerDashboard = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const DeliveryPartnerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [locationTrackingEnabled, setLocationTrackingEnabled] = useState(true);
+  const [socket, setSocket] = useState(null);
 
   // Get active order ID for location tracking
   const activeOrderId = assignedOrders.find(order => 
@@ -34,6 +36,84 @@ const DeliveryPartnerDashboard = () => {
     locationTrackingEnabled,
     10000 // Send location every 10 seconds
   );
+
+  // Initialize socket connection
+  useEffect(() => {
+    if (!user || user.role !== 'delivery_partner') return;
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const baseUrl = API_URL.replace('/api', '');
+    
+    const newSocket = io(baseUrl, {
+      auth: {
+        token: localStorage.getItem('token')
+      }
+    });
+
+    newSocket.on('connect', () => {
+      console.log('🔌 Delivery partner socket connected');
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Listen for new order notifications
+    newSocket.on('new-order-available', (data) => {
+      console.log('🆕 New order available:', data);
+      playNotificationSound();
+      toast.success(
+        <div>
+          <strong>New Order Available!</strong>
+          <p className="text-sm">Order #{data.order._id.slice(-8)} - ₹{data.order.deliveryFee} delivery fee</p>
+        </div>,
+        {
+          duration: 5000,
+          icon: '🆕',
+        }
+      );
+      fetchData(); // Refresh orders
+    });
+
+    // Listen for order assignment
+    newSocket.on('order-assigned', (data) => {
+      console.log('✅ Order assigned:', data);
+      playNotificationSound();
+      toast.success(
+        <div>
+          <strong>Order Assigned!</strong>
+          <p className="text-sm">Order #{data.order._id.slice(-8)}</p>
+        </div>,
+        {
+          duration: 4000,
+          icon: '✅',
+        }
+      );
+      fetchData(); // Refresh orders
+    });
+
+    // Listen for order cancellation
+    newSocket.on('order-cancelled', (data) => {
+      console.log('❌ Order cancelled:', data);
+      playNotificationSound();
+      toast.error(
+        <div>
+          <strong>Order Cancelled</strong>
+          <p className="text-sm">Order #{data.order._id.slice(-8)} has been cancelled</p>
+        </div>,
+        {
+          duration: 4000,
+        }
+      );
+      fetchData(); // Refresh orders
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.close();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user || user.role !== 'delivery_partner') {
@@ -48,6 +128,17 @@ const DeliveryPartnerDashboard = () => {
       toast.error(locationError);
     }
   }, [locationError]);
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGS57OmWUwwUUKbj8LZjHAU5j9fxzn0pBSh+zPLaizsKGGS78+mcTwwNTKHh8LplHgU6jtjvz3opBSh+zPLaizsKGGS78+mcTw'); 
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Could not play sound:', err));
+    } catch (error) {
+      console.log('Sound playback error:', error);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);

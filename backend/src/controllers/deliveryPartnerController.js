@@ -1,7 +1,14 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
-const { notifyUserDeliveryAssigned } = require('../utils/notificationService');
+const { 
+  notifyUserDeliveryAssigned,
+  notifyDeliveryPartnerAssignment
+} = require('../utils/notificationService');
+const {
+  notifyDeliveryPartnerOrderAssigned,
+  notifyUserOrderUpdate
+} = require('../services/socketService');
 
 // @desc    Get all available orders for delivery partners
 // @route   GET /api/delivery/orders/available
@@ -84,6 +91,18 @@ exports.acceptOrder = async (req, res) => {
     // Notify user about delivery partner assignment
     try {
       await notifyUserDeliveryAssigned(updatedOrder, req.user);
+      
+      // Notify delivery partner about assignment (push + database)
+      await notifyDeliveryPartnerAssignment(updatedOrder, req.user);
+      
+      // Send real-time socket notifications
+      notifyDeliveryPartnerOrderAssigned(req.user._id.toString(), updatedOrder);
+      
+      // Notify user via socket about delivery partner assignment
+      if (updatedOrder.userId) {
+        const userIdStr = updatedOrder.userId._id ? updatedOrder.userId._id.toString() : updatedOrder.userId.toString();
+        notifyUserOrderUpdate(userIdStr, updatedOrder);
+      }
     } catch (notifyError) {
       console.error('Failed to send delivery assignment notification:', notifyError);
     }

@@ -9,9 +9,20 @@ const {
   notifyUserOrderPlaced,
   notifyOrderReadyForPickup,
   notifyUserDeliveryAssigned,
-  notifyPaymentReminder
+  notifyPaymentReminder,
+  notifyDeliveryPartnerNewOrder,
+  notifyDeliveryPartnerAssignment,
+  notifyDeliveryPartnerOrderReady,
+  notifyDeliveryPartnerOrderCancelled
 } = require('../utils/notificationService');
-const { notifyRestaurantNewOrder: socketNotifyRestaurant, notifyAdminNewOrder, notifyUserOrderUpdate } = require('../services/socketService');
+const { 
+  notifyRestaurantNewOrder: socketNotifyRestaurant, 
+  notifyAdminNewOrder, 
+  notifyUserOrderUpdate,
+  notifyDeliveryPartnersNewOrder,
+  notifyDeliveryPartnerOrderAssigned,
+  notifyDeliveryPartnerOrderCancelled: socketNotifyDeliveryPartnerCancelled
+} = require('../services/socketService');
 const { calculateDistance, calculateDeliveryCharge } = require('../utils/calculateDistance');
 
 // Cancellation policy rules
@@ -516,10 +527,23 @@ exports.updateOrderStatus = async (req, res) => {
         }
         
         // Additional specific notifications
+        if (status === 'confirmed' || status === 'ready') {
+          // Notify all delivery partners about new order available
+          try {
+            const orderData = await notifyDeliveryPartnerNewOrder(populatedOrder);
+            if (orderData) {
+              // Send socket notification to all delivery partners
+              notifyDeliveryPartnersNewOrder(populatedOrder);
+            }
+          } catch (dpError) {
+            console.error('Error notifying delivery partners:', dpError);
+          }
+        }
+        
         if (status === 'ready') {
-          // Notify delivery partner if assigned
+          // Notify delivery partner if already assigned
           if (populatedOrder.deliveryPartnerId) {
-            await notifyOrderReadyForPickup(populatedOrder, populatedOrder.deliveryPartnerId);
+            await notifyDeliveryPartnerOrderReady(populatedOrder, populatedOrder.deliveryPartnerId);
           }
         }
         

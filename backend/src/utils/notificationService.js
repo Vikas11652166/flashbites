@@ -321,6 +321,114 @@ const notifyPaymentReminder = async (order) => {
   }
 };
 
+// Notify delivery partner about new order available
+const notifyDeliveryPartnerNewOrder = async (order) => {
+  try {
+    const orderRef = order.orderNumber || order._id.toString().slice(-8);
+    
+    // This will send push notification to all delivery partners
+    // You can implement logic to notify only nearby partners based on location
+    const notificationData = {
+      title: '🆕 New Order Available',
+      message: `Order #${orderRef} from ${order.restaurantId?.name} - ₹${order.deliveryFee} delivery fee`,
+      type: 'new_order_available',
+      priority: 'high',
+      data: {
+        orderId: order._id,
+        orderNumber: orderRef,
+        restaurantId: order.restaurantId?._id,
+        restaurantName: order.restaurantId?.name,
+        restaurantAddress: order.restaurantId?.address,
+        deliveryFee: order.deliveryFee,
+        deliveryAddress: order.addressId?.street,
+        pickupLocation: order.restaurantId?.location
+      }
+    };
+    
+    // Note: In production, implement geolocation-based filtering
+    // to notify only nearby delivery partners
+    console.log('📢 New order available for delivery partners:', orderRef);
+    
+    return notificationData;
+  } catch (error) {
+    console.error('Error notifying delivery partners about new order:', error);
+  }
+};
+
+// Notify delivery partner about order assignment
+const notifyDeliveryPartnerAssignment = async (order, deliveryPartner) => {
+  try {
+    const orderRef = order.orderNumber || order._id.toString().slice(-8);
+    
+    await notifyUser(deliveryPartner._id || deliveryPartner, {
+      title: '✅ Order Assigned to You',
+      message: `Order #${orderRef} from ${order.restaurantId?.name}`,
+      type: 'order_assigned',
+      priority: 'high',
+      data: {
+        orderId: order._id,
+        orderNumber: orderRef,
+        restaurantId: order.restaurantId?._id,
+        restaurantName: order.restaurantId?.name,
+        restaurantAddress: order.restaurantId?.address,
+        deliveryAddress: order.addressId,
+        customerName: order.userId?.name,
+        customerPhone: order.userId?.phone,
+        deliveryFee: order.deliveryFee,
+        total: order.total,
+        paymentMethod: order.paymentMethod
+      }
+    });
+  } catch (error) {
+    console.error('Error notifying delivery partner assignment:', error);
+  }
+};
+
+// Notify delivery partner when order is ready for pickup
+const notifyDeliveryPartnerOrderReady = async (order, deliveryPartnerId) => {
+  try {
+    const orderRef = order.orderNumber || order._id.toString().slice(-8);
+    
+    await notifyUser(deliveryPartnerId, {
+      title: '📦 Order Ready for Pickup',
+      message: `Order #${orderRef} is ready at ${order.restaurantId?.name}`,
+      type: 'order_ready_pickup',
+      priority: 'high',
+      data: {
+        orderId: order._id,
+        orderNumber: orderRef,
+        restaurantId: order.restaurantId?._id,
+        restaurantName: order.restaurantId?.name,
+        restaurantAddress: order.restaurantId?.address,
+        restaurantPhone: order.restaurantId?.phone
+      }
+    });
+  } catch (error) {
+    console.error('Error notifying delivery partner order ready:', error);
+  }
+};
+
+// Notify delivery partner about order cancellation
+const notifyDeliveryPartnerOrderCancelled = async (order, deliveryPartnerId) => {
+  try {
+    const orderRef = order.orderNumber || order._id.toString().slice(-8);
+    
+    await notifyUser(deliveryPartnerId, {
+      title: '❌ Order Cancelled',
+      message: `Order #${orderRef} has been cancelled`,
+      type: 'order_cancelled',
+      priority: 'high',
+      data: {
+        orderId: order._id,
+        orderNumber: orderRef,
+        cancellationReason: order.cancellationReason
+      }
+    });
+  } catch (error) {
+    console.error('Error notifying delivery partner order cancelled:', error);
+  }
+};
+
 module.exports = {
   createNotification,
   sendPushNotification,
@@ -332,5 +440,9 @@ module.exports = {
   notifyUserOrderPlaced,
   notifyOrderReadyForPickup,
   notifyUserDeliveryAssigned,
-  notifyPaymentReminder
+  notifyPaymentReminder,
+  notifyDeliveryPartnerNewOrder,
+  notifyDeliveryPartnerAssignment,
+  notifyDeliveryPartnerOrderReady,
+  notifyDeliveryPartnerOrderCancelled
 };
