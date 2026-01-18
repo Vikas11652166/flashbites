@@ -8,7 +8,8 @@ const {
   updateRestaurant,
   deleteRestaurant,
   toggleRestaurantStatus,
-  getRestaurantDashboard
+  getRestaurantDashboard,
+  getRestaurantAnalytics
 } = require('../controllers/restaurantController');
 const {
   addMenuItem,
@@ -38,6 +39,7 @@ router.route('/:id')
 
 router.patch('/:id/toggle-status', checkRestaurantOwnership, toggleRestaurantStatus);
 router.get('/:id/dashboard', checkRestaurantOwnership, getRestaurantDashboard);
+router.get('/:id/analytics', checkRestaurantOwnership, getRestaurantAnalytics);
 
 // Menu routes nested under restaurant
 router.route('/:restaurantId/menu')

@@ -13,12 +13,14 @@ const {
   createCoupon,
   getAllCoupons,
   updateCoupon,
-  deleteCoupon
+  deleteCoupon,
+  getComprehensiveAnalytics
 } = require('../controllers/adminController');
 
 router.use(protect, restrictTo('admin')); // All admin routes
 
 router.get('/dashboard', getDashboardStats);
+router.get('/analytics', getComprehensiveAnalytics);
 router.get('/users', getAllUsers);
 router.get('/orders', getAllOrders);
 router.get('/restaurants', getAllRestaurants);

@@ -89,3 +89,9 @@ export const deleteMenuItem = async (restaurantId, itemId) => {
   const response = await axios.delete(`/restaurants/${restaurantId}/menu/${itemId}`);
   return response.data;
 };
+
+// Get restaurant analytics
+export const getRestaurantAnalytics = async (id, params = {}) => {
+  const response = await axios.get(`/restaurants/${id}/analytics`, { params });
+  return response.data;
+};

@@ -350,3 +350,245 @@ exports.deleteCoupon = async (req, res) => {
     errorResponse(res, 500, 'Failed to delete coupon', error.message);
   }
 };
+
+// @desc    Get comprehensive admin analytics
+// @route   GET /api/admin/analytics
+// @access  Private (Admin)
+exports.getComprehensiveAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate, period = '30' } = req.query;
+
+    // Calculate date range
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(end.getTime() - (parseInt(period) * 24 * 60 * 60 * 1000));
+
+    // Overall statistics
+    const totalUsers = await User.countDocuments({ role: 'user' });
+    const totalRestaurants = await Restaurant.countDocuments({ isApproved: true });
+    const activeRestaurants = await Restaurant.countDocuments({ isApproved: true, isActive: true });
+    const pendingRestaurants = await Restaurant.countDocuments({ isApproved: false });
+
+    // Delivery partner stats
+    const totalDeliveryPartners = await User.countDocuments({ role: 'delivery_partner' });
+    const deliveryPartnerStats = await Order.aggregate([
+      {
+        $match: {
+          deliveryPartnerId: { $exists: true, $ne: null },
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: '$deliveryPartnerId',
+          totalDeliveries: { $sum: 1 },
+          completedDeliveries: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'partner'
+        }
+      },
+      {
+        $unwind: '$partner'
+      },
+      {
+        $project: {
+          name: '$partner.name',
+          phone: '$partner.phone',
+          totalDeliveries: 1,
+          completedDeliveries: 1
+        }
+      },
+      { $sort: { totalDeliveries: -1 } },
+      { $limit: 20 }
+    ]);
+
+    // Order statistics
+    const orderStats = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          deliveredOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] }
+          },
+          cancelledOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
+          },
+          totalRevenue: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, '$total', 0] }
+          }
+        }
+      }
+    ]);
+
+    // Payment method breakdown
+    const paymentBreakdown = await Order.aggregate([
+      {
+        $match: {
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Cash collection details (COD orders)
+    const cashOrders = await Order.find({
+      paymentMethod: 'cod',
+      status: 'delivered',
+      createdAt: { $gte: start, $lte: end }
+    })
+      .populate('restaurantId', 'name')
+      .populate('deliveryPartnerId', 'name phone')
+      .populate('userId', 'name phone')
+      .select('orderNumber total createdAt restaurantId deliveryPartnerId userId')
+      .sort('-createdAt')
+      .limit(100);
+
+    // Orders by restaurant
+    const ordersByRestaurant = await Order.aggregate([
+      {
+        $match: {
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: '$restaurantId',
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: '$total' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'restaurants',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'restaurant'
+        }
+      },
+      {
+        $unwind: '$restaurant'
+      },
+      {
+        $project: {
+          name: '$restaurant.name',
+          isActive: '$restaurant.isActive',
+          totalOrders: 1,
+          totalRevenue: 1,
+          avgOrderValue: { $divide: ['$totalRevenue', '$totalOrders'] }
+        }
+      },
+      { $sort: { totalRevenue: -1 } }
+    ]);
+
+    // Daily revenue trend
+    const dailyRevenue = await Order.aggregate([
+      {
+        $match: {
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          date: { $first: '$createdAt' },
+          revenue: { $sum: '$total' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
+    ]);
+
+    // Restaurant status breakdown
+    const restaurantStatus = {
+      total: totalRestaurants + pendingRestaurants,
+      active: activeRestaurants,
+      inactive: await Restaurant.countDocuments({ isApproved: true, isActive: false }),
+      pending: pendingRestaurants
+    };
+
+    const stats = orderStats[0] || {
+      totalOrders: 0,
+      deliveredOrders: 0,
+      cancelledOrders: 0,
+      totalRevenue: 0
+    };
+
+    // Calculate cash vs online breakdown
+    const cashPayment = paymentBreakdown.find(p => p._id === 'cod') || { count: 0, totalAmount: 0 };
+    const onlinePayment = paymentBreakdown.find(p => p._id === 'online') || { count: 0, totalAmount: 0 };
+
+    successResponse(res, 200, 'Comprehensive analytics retrieved', {
+      overview: {
+        totalUsers,
+        totalRestaurants,
+        activeRestaurants,
+        pendingRestaurants,
+        totalDeliveryPartners,
+        totalOrders: stats.totalOrders,
+        deliveredOrders: stats.deliveredOrders,
+        cancelledOrders: stats.cancelledOrders,
+        totalRevenue: stats.totalRevenue,
+        avgOrderValue: stats.deliveredOrders > 0 ? stats.totalRevenue / stats.deliveredOrders : 0
+      },
+      restaurantStatus,
+      ordersByRestaurant,
+      deliveryPartnerStats,
+      paymentBreakdown: {
+        cash: {
+          count: cashPayment.count,
+          amount: cashPayment.totalAmount,
+          percentage: stats.totalRevenue > 0 ? (cashPayment.totalAmount / stats.totalRevenue * 100).toFixed(2) : 0
+        },
+        online: {
+          count: onlinePayment.count,
+          amount: onlinePayment.totalAmount,
+          percentage: stats.totalRevenue > 0 ? (onlinePayment.totalAmount / stats.totalRevenue * 100).toFixed(2) : 0
+        }
+      },
+      cashOrders: cashOrders.map(order => ({
+        orderNumber: order.orderNumber,
+        amount: order.total,
+        date: order.createdAt,
+        restaurant: order.restaurantId?.name || 'N/A',
+        deliveryPartner: order.deliveryPartnerId?.name || 'Not Assigned',
+        deliveryPartnerPhone: order.deliveryPartnerId?.phone || 'N/A',
+        customer: order.userId?.name || 'N/A'
+      })),
+      dailyRevenue,
+      period: {
+        start,
+        end,
+        days: Math.ceil((end - start) / (24 * 60 * 60 * 1000))
+      }
+    });
+  } catch (error) {
+    console.error('Admin analytics error:', error);
+    errorResponse(res, 500, 'Failed to get analytics', error.message);
+  }
+};

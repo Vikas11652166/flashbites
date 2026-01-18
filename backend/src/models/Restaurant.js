@@ -65,11 +65,6 @@ const restaurantSchema = new mongoose.Schema({
       default: '22:00'
     }
   },
-  deliveryFee: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
   deliveryTime: {
     type: String,
     default: '30-40 mins'

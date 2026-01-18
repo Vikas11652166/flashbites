@@ -22,7 +22,8 @@ import {
   getRestaurantMenuItems,
   createMenuItem,
   updateMenuItem,
-  deleteMenuItem 
+  deleteMenuItem,
+  getRestaurantAnalytics 
 } from '../api/restaurantApi';
 import { getRestaurantOrders, updateOrderStatus } from '../api/orderApi';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
@@ -38,6 +39,9 @@ const RestaurantDashboard = () => {
   const [restaurant, setRestaurant] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('30');
   const [loading, setLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
@@ -69,7 +73,6 @@ const RestaurantDashboard = () => {
       open: '09:00',
       close: '22:00',
     },
-    deliveryFee: 0,
     deliveryTime: '30-40 min',
   });
 
@@ -193,7 +196,6 @@ const RestaurantDashboard = () => {
       formData.append('address', JSON.stringify(restaurantData.address));
       formData.append('location', JSON.stringify(restaurantData.location));
       formData.append('timing', JSON.stringify(restaurantData.timing));
-      formData.append('deliveryFee', restaurantData.deliveryFee);
       formData.append('deliveryTime', restaurantData.deliveryTime);
       
       // Append image if selected
@@ -325,6 +327,21 @@ const RestaurantDashboard = () => {
     }
   };
 
+  const fetchAnalytics = async (period = analyticsPeriod) => {
+    if (!restaurant?._id) return;
+    
+    setAnalyticsLoading(true);
+    try {
+      const response = await getRestaurantAnalytics(restaurant._id, { period });
+      setAnalytics(response.data);
+    } catch (error) {
+      toast.error('Failed to load analytics');
+      console.error('Analytics fetch error:', error);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -448,7 +465,6 @@ const RestaurantDashboard = () => {
                       address: restaurant.address,
                       location: restaurant.location,
                       timing: restaurant.timing,
-                      deliveryFee: restaurant.deliveryFee,
                       deliveryTime: restaurant.deliveryTime,
                     });
                     setRestaurantImagePreview(restaurant.image);
@@ -493,16 +509,6 @@ const RestaurantDashboard = () => {
                 <div className="ml-2 sm:ml-4 min-w-0">
                   <p className="text-xs sm:text-sm text-gray-600">Delivery Time</p>
                   <p className="text-base sm:text-2xl font-bold truncate">{restaurant.deliveryTime}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-              <div className="flex items-center">
-                <CurrencyDollarIcon className="h-8 w-8 sm:h-10 sm:w-10 text-green-500 flex-shrink-0" />
-                <div className="ml-2 sm:ml-4 min-w-0">
-                  <p className="text-xs sm:text-sm text-gray-600">Delivery Fee</p>
-                  <p className="text-xl sm:text-2xl font-bold">₹{restaurant.deliveryFee}</p>
                 </div>
               </div>
             </div>
@@ -559,6 +565,19 @@ const RestaurantDashboard = () => {
                     }`}
                   >
                     Orders
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('analytics');
+                      fetchAnalytics();
+                    }}
+                    className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      activeTab === 'analytics'
+                        ? 'border-orange-500 text-orange-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Analytics
                   </button>
                 </nav>
               </div>
@@ -951,6 +970,183 @@ const RestaurantDashboard = () => {
                 )}
               </div>
             )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                {/* Period Selector */}
+                <div className="bg-white rounded-lg shadow-md p-4">
+                  <label className="block text-sm font-medium mb-2">Time Period</label>
+                  <select
+                    value={analyticsPeriod}
+                    onChange={(e) => {
+                      setAnalyticsPeriod(e.target.value);
+                      fetchAnalytics(e.target.value);
+                    }}
+                    className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                  </select>
+                </div>
+
+                {analyticsLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading analytics...</p>
+                  </div>
+                ) : analytics ? (
+                  <>
+                    {/* Overview Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <div className="flex items-center">
+                          <ShoppingBagIcon className="h-10 w-10 text-blue-500 flex-shrink-0" />
+                          <div className="ml-4">
+                            <p className="text-sm text-gray-600">Total Orders</p>
+                            <p className="text-2xl font-bold">{analytics.overview.totalOrders}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <div className="flex items-center">
+                          <CheckCircleIcon className="h-10 w-10 text-green-500 flex-shrink-0" />
+                          <div className="ml-4">
+                            <p className="text-sm text-gray-600">Delivered</p>
+                            <p className="text-2xl font-bold">{analytics.overview.deliveredOrders}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <div className="flex items-center">
+                          <CurrencyDollarIcon className="h-10 w-10 text-green-500 flex-shrink-0" />
+                          <div className="ml-4">
+                            <p className="text-sm text-gray-600">Total Revenue</p>
+                            <p className="text-2xl font-bold">{formatCurrency(analytics.overview.totalRevenue)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <div className="flex items-center">
+                          <ChartBarIcon className="h-10 w-10 text-purple-500 flex-shrink-0" />
+                          <div className="ml-4">
+                            <p className="text-sm text-gray-600">Avg Order Value</p>
+                            <p className="text-2xl font-bold">{formatCurrency(analytics.overview.avgOrderValue)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Daily Revenue Chart */}
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                      <h3 className="text-lg font-bold mb-4">Day-wise Revenue</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {analytics.dailyRevenue.map((day, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {new Date(day.date).toLocaleDateString('en-IN', { 
+                                    day: 'numeric', 
+                                    month: 'short', 
+                                    year: 'numeric' 
+                                  })}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{day.orderCount}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                                  {formatCurrency(day.revenue)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {formatCurrency(day.avgOrderValue)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Payment Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-lg font-bold mb-4">Payment Methods</h3>
+                        <div className="space-y-3">
+                          {analytics.paymentBreakdown.map((method, index) => (
+                            <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium capitalize">{method._id === 'cod' ? 'Cash on Delivery' : 'Online Payment'}</p>
+                                <p className="text-sm text-gray-600">{method.count} orders</p>
+                              </div>
+                              <p className="text-lg font-bold text-green-600">{formatCurrency(method.revenue)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-lg font-bold mb-4">Top Selling Items</h3>
+                        <div className="space-y-3">
+                          {analytics.topItems.slice(0, 5).map((item, index) => (
+                            <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                              <div className="flex-1">
+                                <p className="font-medium truncate">{item.name}</p>
+                                <p className="text-sm text-gray-600">{item.totalSold} sold</p>
+                              </div>
+                              <p className="text-sm font-semibold text-green-600 ml-2">{formatCurrency(item.revenue)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Peak Hours */}
+                    {analytics.hourlyDistribution && analytics.hourlyDistribution.length > 0 && (
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-lg font-bold mb-4">Order Distribution by Hour</h3>
+                        <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
+                          {Array.from({ length: 24 }, (_, hour) => {
+                            const data = analytics.hourlyDistribution.find(h => h._id === hour);
+                            const count = data?.orderCount || 0;
+                            const maxCount = Math.max(...analytics.hourlyDistribution.map(h => h.orderCount));
+                            const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                            
+                            return (
+                              <div key={hour} className="flex flex-col items-center">
+                                <div className="w-full bg-gray-200 rounded-t" style={{ height: '100px', display: 'flex', alignItems: 'flex-end' }}>
+                                  <div
+                                    className="w-full bg-orange-500 rounded-t transition-all"
+                                    style={{ height: `${height}%` }}
+                                    title={`${hour}:00 - ${count} orders`}
+                                  />
+                                </div>
+                                <p className="text-xs mt-1 text-gray-600">{hour}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                    <ChartBarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No analytics data available</p>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1159,40 +1355,22 @@ const RestaurantDashboard = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Delivery Fee (₹)
-                    </label>
-                    <input
-                      type="number"
-                      value={restaurantData.deliveryFee}
-                      onChange={(e) =>
-                        setRestaurantData({
-                          ...restaurantData,
-                          deliveryFee: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Delivery Time
-                    </label>
-                    <input
-                      type="text"
-                      value={restaurantData.deliveryTime}
-                      onChange={(e) =>
-                        setRestaurantData({
-                          ...restaurantData,
-                          deliveryTime: e.target.value,
-                        })
-                      }
-                      placeholder="e.g., 30-40 min"
-                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Delivery Time
+                  </label>
+                  <input
+                    type="text"
+                    value={restaurantData.deliveryTime}
+                    onChange={(e) =>
+                      setRestaurantData({
+                        ...restaurantData,
+                        deliveryTime: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., 30-40 min"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
                 </div>
 
                 {/* Restaurant Image Upload */}

@@ -11,9 +11,11 @@ import {
   CurrencyDollarIcon,
   ArrowPathIcon,
   TruckIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { getRestaurants } from '../api/restaurantApi';
 import { getAllPartnerApplications, approvePartner, rejectPartner } from '../api/partnerApi';
+import { getComprehensiveAnalytics } from '../api/adminApi';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../utils/constants';
 import axios from '../api/axios';
@@ -28,6 +30,9 @@ const AdminPanel = () => {
   const [users, setUsers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [partners, setPartners] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('30');
   const [stats, setStats] = useState({
     totalRestaurants: 0,
     totalUsers: 0,
@@ -144,6 +149,20 @@ const AdminPanel = () => {
       console.error('Failed to load admin data:', error);
       toast.error('Failed to load data');
       setLoading(false);
+    }
+  };
+
+  const fetchAnalytics = async (period = analyticsPeriod) => {
+    setAnalyticsLoading(true);
+    try {
+      const response = await getComprehensiveAnalytics({ period });
+      setAnalytics(response.data.data);
+      console.log('Analytics loaded:', response.data.data);
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+      toast.error('Failed to load analytics');
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -334,6 +353,19 @@ const AdminPanel = () => {
                 }`}
               >
                 Partners ({partners.length})
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('analytics');
+                  fetchAnalytics();
+                }}
+                className={`px-6 py-3 text-sm font-medium ${
+                  activeTab === 'analytics'
+                    ? 'border-b-2 border-orange-500 text-orange-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Analytics
               </button>
             </nav>
           </div>
@@ -704,6 +736,277 @@ const AdminPanel = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div>
+                {/* Period Selector */}
+                <div className="mb-6 flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Business Analytics</h2>
+                  <select
+                    value={analyticsPeriod}
+                    onChange={(e) => {
+                      setAnalyticsPeriod(e.target.value);
+                      fetchAnalytics(e.target.value);
+                    }}
+                    className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                  </select>
+                </div>
+
+                {analyticsLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading analytics...</p>
+                  </div>
+                ) : analytics ? (
+                  <div className="space-y-6">
+                    {/* Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
+                        <div className="flex items-center">
+                          <ShoppingBagIcon className="h-10 w-10 text-blue-600" />
+                          <div className="ml-4">
+                            <p className="text-sm text-blue-800">Total Orders</p>
+                            <p className="text-3xl font-bold text-blue-900">{analytics.overview.totalOrders}</p>
+                            <p className="text-xs text-blue-600 mt-1">{analytics.overview.deliveredOrders} delivered</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
+                        <div className="flex items-center">
+                          <CurrencyDollarIcon className="h-10 w-10 text-green-600" />
+                          <div className="ml-4">
+                            <p className="text-sm text-green-800">Total Revenue</p>
+                            <p className="text-3xl font-bold text-green-900">{formatCurrency(analytics.overview.totalRevenue)}</p>
+                            <p className="text-xs text-green-600 mt-1">Avg: {formatCurrency(analytics.overview.avgOrderValue)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
+                        <div className="flex items-center">
+                          <BuildingStorefrontIcon className="h-10 w-10 text-purple-600" />
+                          <div className="ml-4">
+                            <p className="text-sm text-purple-800">Restaurants</p>
+                            <p className="text-3xl font-bold text-purple-900">{analytics.overview.activeRestaurants}</p>
+                            <p className="text-xs text-purple-600 mt-1">{analytics.overview.pendingRestaurants} pending</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6">
+                        <div className="flex items-center">
+                          <TruckIcon className="h-10 w-10 text-orange-600" />
+                          <div className="ml-4">
+                            <p className="text-sm text-orange-800">Delivery Partners</p>
+                            <p className="text-3xl font-bold text-orange-900">{analytics.overview.totalDeliveryPartners}</p>
+                            <p className="text-xs text-orange-600 mt-1">Active fleet</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payment Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="text-lg font-bold mb-4">Payment Methods</h3>
+                        <div className="space-y-4">
+                          <div className="p-4 bg-green-50 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-semibold text-green-900">💳 Online Payments</span>
+                              <span className="text-sm text-green-600">{analytics.paymentBreakdown.online.percentage}%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-green-700">{analytics.paymentBreakdown.online.count} orders</span>
+                              <span className="text-lg font-bold text-green-900">{formatCurrency(analytics.paymentBreakdown.online.amount)}</span>
+                            </div>
+                          </div>
+
+                          <div className="p-4 bg-orange-50 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-semibold text-orange-900">💵 Cash on Delivery</span>
+                              <span className="text-sm text-orange-600">{analytics.paymentBreakdown.cash.percentage}%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-orange-700">{analytics.paymentBreakdown.cash.count} orders</span>
+                              <span className="text-lg font-bold text-orange-900">{formatCurrency(analytics.paymentBreakdown.cash.amount)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="text-lg font-bold mb-4">Restaurant Status</h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="font-medium">Total Restaurants</span>
+                            <span className="text-2xl font-bold">{analytics.restaurantStatus.total}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                            <span className="font-medium text-green-700">🟢 Active</span>
+                            <span className="text-xl font-bold text-green-900">{analytics.restaurantStatus.active}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="font-medium text-gray-700">⚫ Inactive</span>
+                            <span className="text-xl font-bold text-gray-900">{analytics.restaurantStatus.inactive}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                            <span className="font-medium text-orange-700">⏳ Pending Approval</span>
+                            <span className="text-xl font-bold text-orange-900">{analytics.restaurantStatus.pending}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top Restaurants */}
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-bold mb-4">Top Performing Restaurants</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Restaurant</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orders</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Order</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {analytics.ordersByRestaurant.slice(0, 10).map((restaurant, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{restaurant.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                  <span className={`px-2 py-1 rounded-full text-xs ${restaurant.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                    {restaurant.isActive ? '🟢 Active' : '⚫ Inactive'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{restaurant.totalOrders}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                                  {formatCurrency(restaurant.totalRevenue)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {formatCurrency(restaurant.avgOrderValue)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Delivery Partners Performance */}
+                    {analytics.deliveryPartnerStats && analytics.deliveryPartnerStats.length > 0 && (
+                      <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="text-lg font-bold mb-4">Top Delivery Partners</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {analytics.deliveryPartnerStats.slice(0, 6).map((partner, index) => (
+                            <div key={index} className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-gray-900">{partner.name}</h4>
+                                <TruckIcon className="h-5 w-5 text-blue-600" />
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{partner.phone}</p>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-700">Total Deliveries:</span>
+                                <span className="font-semibold">{partner.totalDeliveries}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-700">Completed:</span>
+                                <span className="font-semibold text-green-600">{partner.completedDeliveries}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cash Collection Details */}
+                    {analytics.cashOrders && analytics.cashOrders.length > 0 && (
+                      <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="text-lg font-bold mb-4">Recent Cash Collections (COD)</h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Restaurant</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivery Partner</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {analytics.cashOrders.slice(0, 20).map((order, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.orderNumber}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {new Date(order.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.restaurant}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <div>
+                                      <p className="font-medium">{order.deliveryPartner}</p>
+                                      <p className="text-xs text-gray-500">{order.deliveryPartnerPhone}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-orange-600">
+                                    {formatCurrency(order.amount)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily Revenue Trend */}
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-bold mb-4">Daily Revenue Trend</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orders</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {analytics.dailyRevenue.map((day, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {new Date(day.date).toLocaleDateString('en-IN', { 
+                                    day: 'numeric', 
+                                    month: 'short', 
+                                    year: 'numeric' 
+                                  })}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{day.orderCount}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                                  {formatCurrency(day.revenue)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <ChartBarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No analytics data available</p>
                   </div>
                 )}
               </div>

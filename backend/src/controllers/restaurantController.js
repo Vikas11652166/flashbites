@@ -282,3 +282,153 @@ exports.getRestaurantDashboard = async (req, res) => {
     errorResponse(res, 500, 'Failed to get dashboard data', error.message);
   }
 };
+
+// @desc    Get restaurant analytics with day-wise revenue
+// @route   GET /api/restaurants/:id/analytics
+// @access  Private (Restaurant Owner)
+exports.getRestaurantAnalytics = async (req, res) => {
+  try {
+    const Order = require('../models/Order');
+    const Payment = require('../models/Payment');
+    const restaurantId = req.params.id;
+    const { startDate, endDate, period = '30' } = req.query;
+
+    // Calculate date range
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(end.getTime() - (parseInt(period) * 24 * 60 * 60 * 1000));
+
+    // Get total orders and delivered orders
+    const orderStats = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          deliveredOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] }
+          },
+          totalRevenue: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, '$total', 0] }
+          },
+          totalOrderValue: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Get day-wise revenue breakdown
+    const dailyRevenue = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          date: { $first: '$createdAt' },
+          revenue: { $sum: '$total' },
+          orderCount: { $sum: 1 },
+          avgOrderValue: { $avg: '$total' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
+    ]);
+
+    // Get payment method breakdown
+    const paymentBreakdown = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          count: { $sum: 1 },
+          revenue: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Get hourly order distribution (peak hours)
+    const hourlyDistribution = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: { $hour: '$createdAt' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    // Get top selling items
+    const topItems = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId),
+          status: 'delivered',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          name: { $first: '$items.name' },
+          totalSold: { $sum: '$items.quantity' },
+          revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+        }
+      },
+      { $sort: { totalSold: -1 } },
+      { $limit: 10 }
+    ]);
+
+    const stats = orderStats[0] || {
+      totalOrders: 0,
+      deliveredOrders: 0,
+      totalRevenue: 0,
+      totalOrderValue: 0
+    };
+
+    successResponse(res, 200, 'Analytics retrieved successfully', {
+      overview: {
+        totalOrders: stats.totalOrders,
+        deliveredOrders: stats.deliveredOrders,
+        totalRevenue: stats.totalRevenue,
+        totalOrderValue: stats.totalOrderValue,
+        avgOrderValue: stats.deliveredOrders > 0 ? stats.totalRevenue / stats.deliveredOrders : 0
+      },
+      dailyRevenue,
+      paymentBreakdown,
+      hourlyDistribution,
+      topItems,
+      period: {
+        start,
+        end,
+        days: Math.ceil((end - start) / (24 * 60 * 60 * 1000))
+      }
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    errorResponse(res, 500, 'Failed to get analytics', error.message);
+  }
+};

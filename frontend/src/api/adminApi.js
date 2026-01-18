@@ -23,3 +23,7 @@ export const approveRestaurant = (id, isApproved) => {
 export const blockUser = (id, isActive) => {
   return axios.patch(`/admin/users/${id}/block`, { isActive });
 };
+
+export const getComprehensiveAnalytics = (params) => {
+  return axios.get('/admin/analytics', { params });
+};
