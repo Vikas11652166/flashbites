@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ShoppingCartIcon,
   UserCircleIcon,
   Bars3Icon,
+  HomeIcon,
+  MapPinIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../redux/slices/authSlice';
 import { toggleCart } from '../../redux/slices/uiSlice';
@@ -14,6 +17,7 @@ import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const { items } = useSelector((state) => state.cart);
@@ -28,10 +32,17 @@ const Navbar = () => {
 
   const cartItemCount = items.reduce((total, item) => total + item.quantity, 0);
 
+  const isActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <nav className="bg-white z-50">
+      {/* Desktop / tablet header */}
+      <div className="hidden md:block shadow-md sticky top-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <img 
@@ -141,24 +152,8 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile menu button (hidden on desktop container) */}
           <div className="md:hidden flex items-center space-x-2">
-            {/* Cart Icon for Mobile */}
-            {isAuthenticated && (
-              <button
-                onClick={() => dispatch(toggleCart())}
-                className="relative p-2 text-gray-700"
-              >
-                <ShoppingCartIcon className="h-6 w-6" />
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {cartItemCount}
-                  </span>
-                )}
-              </button>
-            )}
-            
-            {/* Hamburger Menu */}
             <button 
               className="p-2 text-gray-700"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -259,6 +254,65 @@ const Navbar = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Close desktop wrapper */}
+      </div>
+
+      {/* Bottom navigation - small screens only */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-6px_20px_-12px_rgba(0,0,0,0.35)]"
+        style={{ paddingBottom: 'calc(8px + var(--safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-between px-4 pt-2 pb-1 text-xs text-gray-600">
+          <Link
+            to="/"
+            className={`flex-1 flex flex-col items-center gap-1 ${isActive('/') ? 'text-primary-600' : ''}`}
+          >
+            <HomeIcon className="h-6 w-6" />
+            <span>Home</span>
+          </Link>
+
+          <Link
+            to="/restaurants"
+            className={`flex-1 flex flex-col items-center gap-1 ${isActive('/restaurants') ? 'text-primary-600' : ''}`}
+          >
+            <MapPinIcon className="h-6 w-6" />
+            <span>Discover</span>
+          </Link>
+
+          <button
+            onClick={() => dispatch(toggleCart())}
+            className="relative flex-1 flex flex-col items-center gap-1"
+            aria-label="Cart"
+          >
+            <div className={`${cartItemCount > 0 ? 'text-primary-600' : 'text-gray-700'}`}>
+              <ShoppingCartIcon className="h-6 w-6" />
+            </div>
+            <span>Cart</span>
+            {cartItemCount > 0 && (
+              <span className="absolute -top-1 right-3 bg-primary-600 text-white text-[10px] rounded-full h-4 min-w-[1rem] px-1 flex items-center justify-center">
+                {cartItemCount}
+              </span>
+            )}
+          </button>
+
+          <Link
+            to={isAuthenticated ? '/orders' : '/login'}
+            className={`flex-1 flex flex-col items-center gap-1 ${isActive('/orders') ? 'text-primary-600' : ''}`}
+          >
+            <ShoppingBagIcon className="h-6 w-6" />
+            <span>Orders</span>
+          </Link>
+
+          <Link
+            to={isAuthenticated ? '/profile' : '/login'}
+            className={`flex-1 flex flex-col items-center gap-1 ${isActive('/profile') ? 'text-primary-600' : ''}`}
+          >
+            <UserCircleIcon className="h-6 w-6" />
+            <span>{isAuthenticated ? 'Profile' : 'Login'}</span>
+          </Link>
+        </div>
       </div>
     </nav>
   );

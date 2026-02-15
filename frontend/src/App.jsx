@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { getCurrentUser } from './redux/slices/authSlice';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -37,17 +39,23 @@ import NotFound from './pages/NotFound';
 // Google OAuth Success Handler
 const GoogleAuthSuccess = () => {
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const refreshToken = params.get('refresh');
+    const handleAuth = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const refreshToken = params.get('refresh');
 
-    if (token && refreshToken) {
-      localStorage.setItem('accessToken', token);
-      localStorage.setItem('refreshToken', refreshToken);
-      window.location.href = '/';
-    } else {
-      window.location.href = '/login?error=Authentication failed';
-    }
+      if (token && refreshToken) {
+        // Use Preferences instead of localStorage
+        const { Preferences } = await import('@capacitor/preferences');
+        await Preferences.set({ key: 'accessToken', value: token });
+        await Preferences.set({ key: 'refreshToken', value: refreshToken });
+        window.location.href = '/';
+      } else {
+        window.location.href = '/login?error=Authentication failed';
+      }
+    };
+
+    handleAuth();
   }, []);
 
   return (
@@ -67,6 +75,33 @@ function App() {
   // Initialize notification system
   useNotifications();
 
+  // Check platform
+  const isNative = Capacitor.getPlatform() !== 'web';
+
+  // Initialize status bar for native platforms
+  useEffect(() => {
+    const initializeStatusBar = async () => {
+      try {
+        if (isNative && Capacitor.isPluginAvailable('StatusBar')) {
+          // Set status bar to transparent or match app color
+          await StatusBar.setStyle({ style: Style.Light });
+          await StatusBar.setBackgroundColor({ color: '#e11d48' }); // Your primary color (rose-600)
+          console.log('Status bar initialized successfully');
+        }
+      } catch (error) {
+        console.warn('Error setting status bar (non-critical):', error);
+        // Don't throw - this is non-critical
+      }
+    };
+
+    // Add delay to ensure app is fully loaded
+    const timer = setTimeout(() => {
+      initializeStatusBar();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [isNative]);
+
   useEffect(() => {
     if (isAuthenticated) {
       dispatch(getCurrentUser());
@@ -80,7 +115,7 @@ function App() {
         <div className="flex flex-col min-h-screen">
           <Navbar />
           
-          <main className="flex-1">
+          <main className="flex-1 pb-20 md:pb-0">
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
